@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Dense, Dropout,Flatten,Conv2D,MaxPool2D
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.initializers import GlorotUniform, RandomUniform
 from sklearn.model_selection import cross_val_score, KFold, train_test_split
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import cv2
 import os
@@ -102,48 +102,60 @@ def determine_labels(img_names):
     return labels
 
 # The CNN Model
-
+def plotHistory(history):
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    # summarize history for loss
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
 def CNN(X,y):
     X=X.reshape(-1, 128, 128, 1)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.50,stratify=y, shuffle=True, random_state=1)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.50, shuffle=True, random_state=1)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.50,stratify=y_train, shuffle=True, random_state=1)
     # building a linear stack of layers with the sequential model
     model = Sequential()
-    model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', input_shape=(128,128,1)))
+    model.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', input_shape=(128,128,1)))
     model.add(MaxPool2D((2, 2)))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
     model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
     model.add(MaxPool2D((2, 2)))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
+
     model.add(Flatten())
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
-    model.add(Dense(400, activation='softmax'))
+    model.add(Dense(401, activation='softmax'))
     print(model.summary())
 	# compile model
-    opt = RMSprop(learning_rate=0.001, rho=0.9, momentum=0.0)
-    model.compile(optimizer=opt, loss='binary_crossentropy', metrics=['accuracy'])
-    early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=0, patience=10)
+    opt = RMSprop(learning_rate=0.01, rho=0.9, momentum=0.0)
+    model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['acc'])
     
-    batches = 32
-    epochs=200
+    batches = 256
+    epochs=150
     # fit model
-    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batches, verbose=1,callbacks=early_stop )
-
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batches, verbose=1)
+    plotHistory(model.history)
 
     _, validation_accuracy = model.evaluate(X_val, y_val, batch_size=batches)
     _, test_accuracy = model.evaluate(X_test, y_test, batch_size=batches)
+
+    print('Validation Accuracy: %f, Test Accuracy: %.3f'  % (validation_accuracy*100, test_accuracy*100))
 
     
 
 img_names,img_crops= get_iris_crop() # Read all data and get the iris part, image_names-> names of the images, img_crops-> preprocessed images
 img_labels=determine_labels(img_names) # Label the images based on their names
 
-# One Hot Encoding fot the labels, to be able to give them to CNN model with a proper shape.
-from sklearn.preprocessing import OneHotEncoder
-img_labels=img_labels.reshape(-1,1)
-onehot_encoder = OneHotEncoder()
-onehot_encoded = onehot_encoder.fit_transform(img_labels).toarray()
 
 
-CNN(img_crops,onehot_encoded)
+CNN(img_crops,img_labels)
 
